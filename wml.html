@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex" />
+  <title>WebMidiLink 2 Web Midi</title>
+  <link type="text/css" rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" />
+</head>
+<body>
+  <h2 class="page-header" style="margin:0;">WebMidiLink 2 Web Midi</h2>
+  <p class="text-right"><small>By <a href="https://logue.be/" target="_blank">Logue</a></small></p>
+  <p>Select Device</p>
+  <div class="form-horizontal">
+    <div class="form-group">
+      <label for="midi_in" class="col-sm-2 control-label">MIDI In:</label>
+      <div class="col-sm-10">
+        <select class="form-control" id="midi_in"></select>
+      </div>
+    </div>
+    <div class="form-group">
+     <label for="midi_out" class="col-sm-2 control-label">MIDI Out:</label>
+      <div class="col-sm-10">
+        <select class="form-control" id="midi_out"></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="col-sm-offset-2 col-sm-10">
+        <button class="btn btn-default" id="reflesh_device"><span class="glyphicon glyphicon-refresh"><span> Reflesh MIDI Device</button>
+        <button class="btn btn-default btn-warning" id="panic"><span class="glyphicon glyphicon-remove-circle"><span> Panic</button>
+      </div>
+    </div>
+  </div>
+  <script type="text/javascript src="https://cdn.rawgit.com/cwilso/WebMIDIAPIShim/gh-pages/lib/WebMIDIAPI.min.js"></script>
+  <script type="text/javascript">
+/*<![CDATA[*/
+var midi = null;
+/** @type {Array.<MIDIInput>} */
+var inputs = [];
+/** @type {Array.<MIDIOutput>} */
+var outputs = [];
+
+var wml = window.opener ? window.opener :  window.parent;
+
+// Setup Web MIDI API
+function loadMidiDevice(){
+  navigator.requestMIDIAccess({sysex : true}).then(onMIDISuccess, (function(e){console.error('Error',e)}) );
+}
+
+function onMIDISuccess(m){
+  midi = m;
+  var in_elem = document.getElementById('midi_in');
+  var out_elem = document.getElementById('midi_out');
+ 
+  in_elem.innerHTML = '';
+  out_elem.innerHTML = '';
+  var it = midi.inputs.values();
+  for(var o = it.next(); !o.done; o = it.next()){
+    var in_option = document.createElement('option');
+    inputs.push(o.value);
+    in_option.text = o.value.name;
+    in_option.value = o.value.id;
+    in_elem.appendChild(in_option);
+  }
+
+  out_elem.innerHTML = '';
+  var ot = midi.outputs.values();
+  var i = 0;
+  for(var o = ot.next(); !o.done; o = ot.next()){
+    var out_option = document.createElement('option');
+    outputs.push(o.value);
+    out_option.text = o.value.name;
+    out_option.value = o.value.id;
+    out_elem.appendChild(out_option);
+    outputs[i].send([0xb0,0x78,0x00]);
+    i++;
+  }
+
+  for(var cnt=0;cnt < inputs.length;cnt++){
+    inputs[cnt].onmidimessage = onMIDIEvent;
+  }
+
+  // Recieve WebMidiLink
+  window.addEventListener("message", function(ev){
+    var msg = typeof ev.data.split === 'function' ? ev.data.split(',') : '';
+    var type = msg !== '' ? msg.shift() : '';
+    if (type === 'midi'){
+      outputs[out_elem.value].send(msg.map(function(hex) {
+        return parseInt(hex, 16);
+      }));
+    }
+  }, false);
+
+  // All sounds off
+  document.getElementById('panic').onclick = function(){
+    outputs[out_elem.value].send([0xb0,0x78,0x00]);
+  };
+  wml.postMessage("link,ready", '*');
+}
+
+window.addEventListener('DOMContentLoaded', function(event) {
+  wml.postMessage("link,patch", '*');
+  loadMidiDevice();
+  document.getElementById('reflesh_device').onclick = loadMidiDevice();
+});
+
+function onMIDIEvent(e){
+  if(e.data[2] !== 0){
+    outputs[out_elem.value].send(data);
+  }
+}
+/*]]>*/
+ </script>
+</body>
+</html>
